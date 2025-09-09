@@ -1,0 +1,45 @@
+.diff-container {
+  border: 1px solid #eee;
+  padding: 15px;
+  margin-top: 20px;
+  border-radius: 5px;
+}
+
+.diff-text-box {
+  background-color: #f9f9f9;
+  padding: 10px;
+  border: 1px solid #ddd;
+  line-height: 1.6;
+  white-space: pre-wrap; /* This preserves whitespace and wraps text */
+}
+
+.correct {
+  color: #2e7d32; /* A dark green */
+  background-color: #e8f5e9;
+}
+
+.incorrect {
+  color: #c62828; /* A dark red */
+  background-color: #ffebee;
+  font-weight: bold;
+}
+
+.missing {
+  color: #e65100; /* A dark orange */
+  background-color: #fff3e0;
+  text-decoration: line-through;
+}
+
+/* Legend styles */
+.legend-correct {
+  color: #2e7d32;
+  font-weight: bold;
+}
+.legend-incorrect {
+  color: #c62828;
+  font-weight: bold;
+}
+.legend-missing {
+  color: #e65100;
+  font-weight: bold;
+}
