@@ -58,9 +58,8 @@ exports.getTextById = async (req, res) => {
 // @desc    Upload a PDF and extract text
 // @route   POST /api/texts/upload/pdf
 // @access  Private
-const pdf = require('pdf-parse');
-
 exports.uploadPdf = async (req, res) => {
+    const pdf = require('pdf-parse');
     try {
         if (!req.file) {
             return res.status(400).json({ msg: 'No file uploaded.' });
