@@ -8,7 +8,7 @@ const { parseScript, getCharacterStats } = require('../utils/scriptParser');
 // @access  Private (for now, we assume a user is logged in)
 exports.createText = async (req, res) => {
   try {
-    const { title, content, type } = req.body;
+    const { title, content, type, reviewers } = req.body;
 
     const textData = {
       title,
@@ -19,6 +19,9 @@ exports.createText = async (req, res) => {
 
     if (type === 'theatre') {
       textData.structure = parseScript(content);
+      if (reviewers) {
+        textData.reviewers = reviewers;
+      }
     }
 
     const newText = new Texte(textData);
@@ -89,7 +92,12 @@ exports.uploadPdf = async (req, res) => {
 // @access  Private
 exports.getTexts = async (req, res) => {
     try {
-        const texts = await Texte.find({ user: req.user.id }).sort({ createdAt: -1 });
+        const texts = await Texte.find({
+            $or: [
+                { user: req.user.id },
+                { reviewers: req.user.id }
+            ]
+        }).populate('user', 'name').sort({ createdAt: -1 });
         res.json(texts);
     } catch (err) {
         console.error(err.message);
