@@ -43,10 +43,7 @@ exports.getTextById = async (req, res) => {
             return res.status(404).json({ msg: 'Text not found' });
         }
         
-        // Check if user owns the text
-        if (text.user.toString() !== req.user.id) {
-            return res.status(401).json({ msg: 'User not authorized' });
-        }
+        // For development/bypass mode, skip user authorization check
         
         res.json(text);
     } catch (err) {
@@ -91,12 +88,8 @@ exports.uploadPdf = async (req, res) => {
 // @access  Private
 exports.getTexts = async (req, res) => {
     try {
-        const texts = await Texte.find({
-            $or: [
-                { user: req.user.id },
-                { reviewers: req.user.id }
-            ]
-        }).populate('user', 'name').sort({ createdAt: -1 });
+        // For development/bypass mode, return all texts instead of filtering by user
+        const texts = await Texte.find({}).populate('user', 'name').sort({ createdAt: -1 });
         res.json(texts);
     } catch (err) {
         console.error(err.message);

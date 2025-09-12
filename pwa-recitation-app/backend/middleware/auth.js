@@ -4,9 +4,14 @@ module.exports = function (req, res, next) {
   // Get token from header
   const token = req.header('x-auth-token'); // A common practice, but can be 'Authorization' header as well
 
-  // Check if not token
+  // Check if not token - for development/bypass mode, use default user
   if (!token) {
-    return res.status(401).json({ msg: 'No token, authorization denied' });
+    // Use a default user for development when authentication is bypassed
+    req.user = { 
+      id: '000000000000000000000001', // Default ObjectId format
+      name: 'Default User'
+    };
+    return next();
   }
 
   // Verify token
@@ -15,6 +20,11 @@ module.exports = function (req, res, next) {
     req.user = decoded.user;
     next();
   } catch (err) {
-    res.status(401).json({ msg: 'Token is not valid' });
+    // If token is invalid, also use default user for development
+    req.user = { 
+      id: '000000000000000000000001', // Default ObjectId format
+      name: 'Default User'
+    };
+    next();
   }
 };
