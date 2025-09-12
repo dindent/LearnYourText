@@ -1,7 +1,7 @@
 const Texte = require('../models/Texte');
 const Rapport = require('../models/Rapport');
 const diff_match_patch = require('diff-match-patch');
-const { parseScript } = require('../utils/scriptParser');
+const { parseScript, getCharacterStats } = require('../utils/scriptParser');
 
 // @desc    Create a new text
 // @route   POST /api/texts
@@ -39,7 +39,12 @@ exports.getTextById = async (req, res) => {
         if (!text) {
             return res.status(404).json({ msg: 'Text not found' });
         }
-        // TODO: check if user owns the text
+        
+        // Check if user owns the text
+        if (text.user.toString() !== req.user.id) {
+            return res.status(401).json({ msg: 'User not authorized' });
+        }
+        
         res.json(text);
     } catch (err) {
         console.error(err.message);
@@ -103,6 +108,11 @@ exports.analyzeText = async (req, res) => {
             return res.status(404).json({ msg: 'Text not found' });
         }
 
+        // Check if user owns the text
+        if (originalText.user.toString() !== req.user.id) {
+            return res.status(401).json({ msg: 'User not authorized' });
+        }
+
         const { recitedText } = req.body;
 
         // 1. Initialize the diff-match-patch library
@@ -119,16 +129,119 @@ exports.analyzeText = async (req, res) => {
         const longerTextLength = Math.max(originalText.content.length, recitedText.length);
         const fidelityScore = ((longerTextLength - levenshteinDistance) / longerTextLength) * 100;
 
-        // TODO: Save the report to the database
-        // const report = new Rapport({ ... }); await report.save();
+        // 5. Save the report to the database
+        const report = new Rapport({
+            user: req.user.id,
+            texte: req.params.id,
+            recitedText: recitedText,
+            diff: diff,
+            fidelityScore: parseFloat(fidelityScore.toFixed(2)),
+        });
+        await report.save();
 
         res.json({
             diff,
             fidelityScore: parseFloat(fidelityScore.toFixed(2)),
+            reportId: report._id,
         });
 
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server Error');
+    }
+};
+
+// @desc    Delete a text by ID
+// @route   DELETE /api/texts/:id
+// @access  Private
+exports.deleteText = async (req, res) => {
+    try {
+        const text = await Texte.findById(req.params.id);
+        if (!text) {
+            return res.status(404).json({ msg: 'Text not found' });
+        }
+
+        // Check if user owns the text
+        if (text.user.toString() !== req.user.id) {
+            return res.status(401).json({ msg: 'User not authorized' });
+        }
+
+        await Texte.findByIdAndDelete(req.params.id);
+        res.json({ msg: 'Text removed' });
+
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
+// @desc    Parse and analyze a theatre script
+// @route   POST /api/texts/:id/parse-theatre
+// @access  Private
+exports.parseTheatreScript = async (req, res) => {
+    try {
+        const text = await Texte.findById(req.params.id);
+        if (!text) {
+            return res.status(404).json({ msg: 'Text not found' });
+        }
+
+        // Check if user owns the text
+        if (text.user.toString() !== req.user.id) {
+            return res.status(401).json({ msg: 'User not authorized' });
+        }
+
+        // Parse the script with the enhanced parser
+        const parsedScript = parseScript(text.content);
+        const characterStats = getCharacterStats(parsedScript);
+
+        // Update the text with the new structure
+        text.structure = parsedScript;
+        text.type = 'theatre';
+        await text.save();
+
+        res.json({
+            parsedScript,
+            characterStats,
+            characterCount: Object.keys(characterStats).length,
+            totalLines: parsedScript.length
+        });
+
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+};
+
+// @desc    Test theatre script parsing without saving
+// @route   POST /api/texts/test-parse
+// @access  Private
+exports.testParseScript = async (req, res) => {
+    try {
+        const { content } = req.body;
+        
+        if (!content) {
+            return res.status(400).json({ msg: 'Content is required' });
+        }
+
+        // Parse the script with the enhanced parser
+        const parsedScript = parseScript(content);
+        const characterStats = getCharacterStats(parsedScript);
+
+        res.json({
+            success: true,
+            parsedScript,
+            characterStats,
+            characterCount: Object.keys(characterStats).length,
+            totalLines: parsedScript.length,
+            preview: parsedScript.slice(0, 10) // First 10 lines for preview
+        });
+
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Parsing failed',
+            details: err.message 
+        });
     }
 };

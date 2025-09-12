@@ -24,6 +24,10 @@ const AppContent = () => {
   const { isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
 
+  // Temporarily bypass authentication - set to true for development
+  const bypassAuth = true;
+  const shouldShowAuth = !bypassAuth && isAuthenticated;
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -33,36 +37,63 @@ const AppContent = () => {
     <div className="App">
       <header>
         <nav>
-          <ul>
-            <li><Link to="/">Accueil</Link></li>
-            {isAuthenticated ? (
-              <>
-                <li><Link to="/dashboard">Tableau de bord</Link></li>
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-8">
+              <Link to="/" className="text-xl font-bold text-primary">
+                📚 LearnYourText
+              </Link>
+              <ul className="flex items-center gap-6">
+                <li><Link to="/">Accueil</Link></li>
+                <li><Link to="/dashboard">Mes Textes</Link></li>
                 <li><Link to="/import">Importer</Link></li>
-                <li><button onClick={handleLogout}>Déconnexion</button></li>
-              </>
-            ) : (
-              <>
-                <li><Link to="/login">Connexion</Link></li>
-                <li><Link to="/register">Inscription</Link></li>
-              </>
-            )}
-          </ul>
+              </ul>
+            </div>
+            
+            {/* Authentication UI (hidden when bypassed) */}
+            <div style={{ display: bypassAuth ? 'none' : 'flex', gap: '1rem' }}>
+              {shouldShowAuth ? (
+                <button onClick={handleLogout} className="btn btn-secondary btn-sm">
+                  Déconnexion
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  <Link to="/login" className="btn btn-secondary btn-sm">Connexion</Link>
+                  <Link to="/register" className="btn btn-primary btn-sm">Inscription</Link>
+                </div>
+              )}
+            </div>
+          </div>
         </nav>
       </header>
+      
       <main>
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          
+          {/* Show auth pages only when not bypassed */}
+          {!bypassAuth && (
+            <>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+            </>
+          )}
 
-          {/* Protected Routes */}
-          <Route element={<PrivateRoute />}>
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/import" element={<ImportPage />} />
-            <Route path="/recite/:textId" element={<RecitationPage />} />
-            <Route path="/theatre/:textId" element={<TheatrePage />} />
-          </Route>
+          {/* Main Routes - accessible when auth is bypassed or user is authenticated */}
+          {bypassAuth ? (
+            <>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/import" element={<ImportPage />} />
+              <Route path="/recite/:textId" element={<RecitationPage />} />
+              <Route path="/theatre/:textId" element={<TheatrePage />} />
+            </>
+          ) : (
+            <Route element={<PrivateRoute />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/import" element={<ImportPage />} />
+              <Route path="/recite/:textId" element={<RecitationPage />} />
+              <Route path="/theatre/:textId" element={<TheatrePage />} />
+            </Route>
+          )}
         </Routes>
       </main>
     </div>

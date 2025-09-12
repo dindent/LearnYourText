@@ -6,6 +6,9 @@ const {
   getTextById,
   analyzeText,
   uploadPdf,
+  deleteText,
+  parseTheatreScript,
+  testParseScript,
 } = require('../controllers/textsController');
 const multer = require('multer');
 const auth = require('../middleware/auth');
@@ -40,5 +43,19 @@ router.post('/:id/analyze', auth, analyzeText);
 // @access   Private
 router.post('/upload/pdf', auth, upload.single('pdfFile'), uploadPdf);
 
+// @route    DELETE api/texts/:id
+// @desc     Delete a text by ID
+// @access   Private
+router.delete('/:id', auth, deleteText);
+
+// @route    POST api/texts/test-parse
+// @desc     Test theatre script parsing without saving
+// @access   Private
+router.post('/test-parse', auth, testParseScript);
+
+// @route    POST api/texts/:id/parse-theatre
+// @desc     Parse and analyze a theatre script
+// @access   Private
+router.post('/:id/parse-theatre', auth, parseTheatreScript);
 
 module.exports = router;

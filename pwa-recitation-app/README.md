@@ -1,33 +1,71 @@
-# PWA de Récitation et d'Apprentissage de Textes
+# 📚 LearnYourText - Application d'Apprentissage de Textes et Théâtre
 
-Cette application est une Progressive Web App (PWA) conçue pour aider les utilisateurs à apprendre et à réciter des textes, avec un mode spécial pour les comédiens et les amateurs de théâtre.
+Une application moderne et professionnelle conçue pour aider les comédiens, étudiants en art dramatique et passionnés de littérature à maîtriser leurs textes et scènes de théâtre.
 
-## 🚀 Fonctionnalités Principales
+## ✨ Fonctionnalités Principales
 
-- **Gestion de Compte Utilisateur** : Inscription et connexion sécurisées avec authentification par JWT.
-- **Importation de Textes Flexible** :
-  - **Manuelle** : Saisissez ou collez n'importe quel texte.
-  - **PDF** : Uploadez un fichier PDF pour en extraire automatiquement le contenu.
-  - **Image (OCR)** : Prenez une photo ou scannez une page, l'application reconnaît et extrait le texte.
-- **Mode d'Apprentissage Individuel** :
-  - Affichez votre texte et récitez-le.
-  - L'application utilise la reconnaissance vocale pour transcrire votre récitation.
-  - Recevez un feedback instantané avec un code couleur :
-    - ✅ **Vert** : Mot correct.
-    - 🟧 **Orange** : Mot manquant.
-    - ❌ **Rouge** : Mot incorrect ou ajouté.
-  - Obtenez un score de fidélité en pourcentage pour suivre votre progression.
-- **Mode Théâtre** :
-  - Importez une pièce de théâtre structurée.
-  - Choisissez votre rôle parmi les personnages de la pièce.
-  - L'application lit les répliques des autres personnages à voix haute (synthèse vocale).
-  - Quand vient votre tour, récitez votre tirade et recevez un feedback ligne par ligne.
+### 🎯 **Mode Récitation Individuelle**
+- Affichage côte-à-côte du texte original et de votre récitation
+- Reconnaissance vocale avancée en français
+- Analyse en temps réel avec feedback visuel coloré
+- Score de précision détaillé avec conseils d'amélioration
+- Interface épurée et focus sur l'entraînement
+
+### 🎭 **Mode Théâtre Interactif**
+- Sélection de rôle parmi tous les personnages de la pièce
+- Lecture automatique des autres personnages par synthèse vocale
+- Mode automatique ou manuel pour contrôler le rythme
+- Analyse ligne par ligne de vos répliques
+- Statistiques de performance en temps réel
+- Progression visuelle dans la pièce
+
+### 📝 **Gestion Avancée des Textes**
+- **Import manuel** : Interface moderne avec prévisualisation
+- **Import PDF** : Extraction automatique du contenu
+- **OCR intelligent** : Reconnaissance de texte à partir d'images avec barre de progression
+- Support des formats théâtre avec détection automatique des personnages
+- Organisation et recherche dans votre bibliothèque
+
+### 🚀 **Interface Moderne**
+- Design professionnel et ergonomique
+- Thème moderne avec palette de couleurs cohérente
+- Navigation intuitive avec icônes expressives
+- Adaptation responsive (mobile, tablette, desktop)
+- Accessibilité améliorée
 
 ## 🛠️ Stack Technique
 
-- **Frontend** : React (avec Create React App), React Router, Axios, Tesseract.js.
-- **Backend** : Node.js, Express.
-- **Base de données** : MongoDB avec Mongoose.
+### Frontend
+- **React 18** avec hooks modernes
+- **React Router v6** pour la navigation
+- **Design System** personnalisé avec CSS variables
+- **Reconnaissance vocale** (Web Speech API)
+- **Synthèse vocale** (Web Speech Synthesis API)
+- **OCR** avec Tesseract.js
+- **Axios** pour les appels API
+
+### Backend
+- **Node.js** avec Express
+- **MongoDB** avec Mongoose
+- **JWT** pour l'authentification
+- **Multer** pour l'upload de fichiers
+- **PDF parsing** et traitement de texte
+
+## 🎨 Améliorations de l'Interface
+
+### Design Professionnel
+- **Palette de couleurs** moderne et accessible
+- **Typographie** soignée avec Google Fonts (Inter)
+- **Composants réutilisables** avec animations subtiles
+- **États de chargement** informatifs
+- **Messages d'erreur** clairs et utiles
+
+### Expérience Utilisateur
+- **Navigation simplifiée** sans authentification obligatoire
+- **Feedback visuel** immédiat sur toutes les actions
+- **Conseils contextuels** pour optimiser l'utilisation
+- **Raccourcis clavier** et navigation au clavier
+- **Indicateurs de progression** pour les tâches longues
 - **Authentification** : JSON Web Tokens (JWT).
 - **Analyse de Texte** : `diff-match-patch`.
 - **APIs Navigateur** : Web Speech API (SpeechRecognition pour le Speech-to-Text) et (SpeechSynthesis pour le Text-to-Speech).
