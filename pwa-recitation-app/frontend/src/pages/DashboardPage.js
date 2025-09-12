@@ -1,23 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
+import { AuthContext } from '../context/AuthContext';
 
 const DashboardPage = () => {
-  const [texts, setTexts] = useState([]);
+  const { user } = useContext(AuthContext);
+  const [myTexts, setMyTexts] = useState([]);
+  const [textsToReview, setTextsToReview] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [stats, setStats] = useState({ total: 0, theatre: 0, individual: 0 });
 
   useEffect(() => {
     const fetchTexts = async () => {
+      if (!user) return;
       try {
         const res = await api.get('/texts');
-        const textsData = res.data || [];
-        setTexts(textsData);
+        const allTexts = res.data || [];
         
-        // Calculate stats
-        const total = textsData.length;
-        const theatre = textsData.filter(t => t.type === 'theatre').length;
+        const ownedTexts = allTexts.filter(t => t.user._id === user._id);
+        const reviewTexts = allTexts.filter(t => t.reviewers.includes(user._id) && t.user._id !== user._id);
+
+        setMyTexts(ownedTexts);
+        setTextsToReview(reviewTexts);
+
+        // Calculate stats based on owned texts
+        const total = ownedTexts.length;
+        const theatre = ownedTexts.filter(t => t.type === 'theatre').length;
         const individual = total - theatre;
         setStats({ total, theatre, individual });
         
@@ -30,13 +39,14 @@ const DashboardPage = () => {
     };
 
     fetchTexts();
-  }, []);
+  }, [user]);
 
   const deleteText = async (id) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer ce texte ?')) {
       try {
         await api.delete(`/texts/${id}`);
-        setTexts(texts.filter(text => text._id !== id));
+        setMyTexts(myTexts.filter(text => text._id !== id));
+        setTextsToReview(textsToReview.filter(text => text._id !== id));
       } catch (err) {
         console.error('Erreur lors de la suppression:', err);
       }
@@ -83,11 +93,11 @@ const DashboardPage = () => {
       </div>
 
       {/* Statistics Cards */}
-      {texts.length > 0 && (
+      {myTexts.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div className="card text-center">
             <div className="text-3xl font-bold text-primary">{stats.total}</div>
-            <div className="text-gray-600">Textes total</div>
+            <div className="text-gray-600">Mes textes</div>
           </div>
           <div className="card text-center">
             <div className="text-3xl font-bold text-primary">{stats.theatre}</div>
@@ -101,9 +111,9 @@ const DashboardPage = () => {
       )}
 
       {/* Texts List */}
-      {texts.length > 0 ? (
+      {myTexts.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {texts.map((text) => (
+          {myTexts.map((text) => (
             <div key={text._id} className="card hover:shadow-lg transition-shadow">
               <div className="card-header">
                 <div className="flex justify-between items-start">
@@ -193,6 +203,33 @@ const DashboardPage = () => {
                 📝 Importer mon premier texte
               </Link>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Texts to Review Section */}
+      {textsToReview.length > 0 && (
+        <div className="mt-12">
+          <h2 className="text-2xl font-bold mb-4">✏️ Textes à réviser</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {textsToReview.map((text) => (
+              <div key={text._id} className="card hover:shadow-lg transition-shadow">
+                <div className="card-header">
+                  <h3 className="card-title">{text.title}</h3>
+                  <p className="text-sm text-gray-500">
+                    Auteur: {text.user.name}
+                  </p>
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <Link
+                    to={`/theatre/${text._id}`}
+                    className="btn btn-secondary flex-1 btn-sm"
+                  >
+                    👀 Voir la pièce
+                  </Link>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

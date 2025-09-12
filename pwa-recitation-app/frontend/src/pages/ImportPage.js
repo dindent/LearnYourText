@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { createWorker } from 'tesseract.js';
@@ -9,7 +9,9 @@ const ImportPage = () => {
     title: '',
     content: '',
     type: 'individual',
+    reviewers: [],
   });
+  const [users, setUsers] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,14 +21,33 @@ const ImportPage = () => {
   const [activeTab, setActiveTab] = useState('manual');
   const navigate = useNavigate();
 
-  const { title, content, type } = formData;
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await api.get('/users');
+        setUsers(res.data);
+      } catch (err) {
+        console.error('Failed to fetch users', err);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  const { title, content, type, reviewers } = formData;
 
   const onManualChange = (e) => {
-    const { name, value, type: inputType, checked } = e.target;
-    setFormData({
-      ...formData,
-      [name]: inputType === 'checkbox' ? (checked ? 'theatre' : 'individual') : value,
-    });
+    const { name, value, type: inputType, checked, options } = e.target;
+    if (name === 'reviewers') {
+      const selectedOptions = Array.from(options)
+        .filter((option) => option.selected)
+        .map((option) => option.value);
+      setFormData({ ...formData, reviewers: selectedOptions });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: inputType === 'checkbox' ? (checked ? 'theatre' : 'individual') : value,
+      });
+    }
     setError('');
   };
 
@@ -253,6 +274,31 @@ const ImportPage = () => {
                 </div>
               </div>
             </div>
+
+            {type === 'theatre' && (
+              <div className="form-group">
+                <label className="form-label" htmlFor="reviewers">
+                  Inviter des utilisateurs à réviser
+                </label>
+                <select
+                  multiple
+                  id="reviewers"
+                  name="reviewers"
+                  value={reviewers}
+                  onChange={onManualChange}
+                  className="form-input"
+                >
+                  {users.map((user) => (
+                    <option key={user._id} value={user._id}>
+                      {user.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-sm text-gray-500 mt-1">
+                  Maintenez Ctrl (ou Cmd sur Mac) pour en sélectionner plusieurs.
+                </p>
+              </div>
+            )}
 
             <div className="form-group">
               <label className="form-label" htmlFor="content">

@@ -26,6 +26,11 @@ const TexteSchema = new Schema({
     type: Schema.Types.Mixed,
     required: false,
   },
+  // utilisateurs autorisés à réviser ce texte
+  reviewers: [{
+    type: Schema.Types.ObjectId,
+    ref: 'User'
+  }],
   createdAt: {
     type: Date,
     default: Date.now,
