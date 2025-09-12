@@ -61,7 +61,7 @@ const detectMethodAllCaps = (text) => {
 
   // Regex for all caps character names (min 2 chars, max 30)
   const characterRegex = /^([A-ZÀ-ÿ\s\-']{2,30})$/;
-  const dialogueRegex = /^[^A-ZÀ-ÿ].*$|^[a-zà-ÿ].*$/;
+  const dialogueRegex = /[a-zà-ÿ]/; // A dialogue line should have at least one lowercase letter.
 
   for (let i = 0; i < lines.length; i++) {
     const trimmedLine = lines[i].trim();
