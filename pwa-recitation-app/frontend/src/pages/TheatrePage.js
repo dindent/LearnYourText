@@ -31,6 +31,36 @@ const TheatrePage = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [autoMode, setAutoMode] = useState(true);
   const [playStats, setPlayStats] = useState({ correctLines: 0, totalLines: 0 });
+  const [listenTimeoutId, setListenTimeoutId] = useState(null);
+  const [recognitionAttempts, setRecognitionAttempts] = useState(0);
+  const [config, setConfig] = useState({
+    fidelityThreshold: 80,
+    speechRate: 0.9,
+    userListenTimeoutMs: 8000,
+    sttMaxAttempts: 2,
+    autoNextDelayMs: 1200,
+    ttsAutoNextDelayMs: 500,
+  });
+
+  // Load persisted configuration
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('theatreConfig');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setConfig(prev => ({ ...prev, ...parsed }));
+        if (typeof parsed.autoMode === 'boolean') {
+          setAutoMode(parsed.autoMode);
+        }
+      }
+    } catch {}
+  }, []);
+
+  const saveConfig = (next) => {
+    const merged = { ...config, ...next };
+    setConfig(merged);
+    try { localStorage.setItem('theatreConfig', JSON.stringify({ ...merged, autoMode })); } catch {}
+  };
 
   // Helper: robust unique characters extraction
   const extractCharactersFromStructure = (structure = []) => {
@@ -114,12 +144,12 @@ const TheatrePage = () => {
       }
       const utterance = new SpeechSynthesisUtterance(line);
       utterance.lang = 'fr-FR';
-      utterance.rate = 0.9;
+      utterance.rate = config.speechRate;
       utterance.onstart = () => setIsReading(true);
       utterance.onend = () => {
         setIsReading(false);
         if (autoMode) {
-          setTimeout(() => setCurrentLineIndex(prev => prev + 1), 500);
+          setTimeout(() => setCurrentLineIndex(prev => prev + 1), config.ttsAutoNextDelayMs);
         }
       };
       synth.speak(utterance);
@@ -130,6 +160,10 @@ const TheatrePage = () => {
       setIsUsersTurn(true);
       setLineResult(null);
       setUserTranscript('');
+      if (autoMode) {
+        // Auto-start recognition for user's turn
+        beginUserRecognition();
+      }
     } else {
       setIsUsersTurn(false);
       if (autoMode) {
@@ -144,12 +178,12 @@ const TheatrePage = () => {
     }
     const utterance = new SpeechSynthesisUtterance(line);
     utterance.lang = 'fr-FR';
-    utterance.rate = 0.9;
+    utterance.rate = config.speechRate;
     utterance.onstart = () => setIsReading(true);
     utterance.onend = () => {
       setIsReading(false);
       if (autoMode) {
-        setTimeout(() => setCurrentLineIndex(prev => prev + 1), 500);
+        setTimeout(() => setCurrentLineIndex(prev => prev + 1), config.ttsAutoNextDelayMs);
       }
     };
     synth.speak(utterance);
@@ -159,47 +193,134 @@ const TheatrePage = () => {
     setSelectedRole(character);
     setCurrentLineIndex(0);
     setPlayStats({ correctLines: 0, totalLines: 0 });
+    // Prime microphone permission on user gesture
+    if (recognition) {
+      try {
+        recognition.onresult = null;
+        recognition.onerror = null;
+        recognition.onend = null;
+        recognition.start();
+        setIsRecording(true);
+        // Stop quickly after permission prompt
+        setTimeout(() => {
+          try { recognition.stop(); } catch {}
+          setIsRecording(false);
+        }, 300);
+      } catch (e) {
+        // Ignore if cannot prime
+      }
+    }
   };
 
-  const handleReciteLine = () => {
+  const clearListenTimeout = () => {
+    if (listenTimeoutId) {
+      clearTimeout(listenTimeoutId);
+      setListenTimeoutId(null);
+    }
+  };
+
+  const beginUserRecognition = () => {
     if (!recognition) {
       setError("La reconnaissance vocale n'est pas supportée.");
       return;
     }
-    
-    setIsRecording(true);
+    // Ensure TTS is not speaking while listening
+    if (synth.speaking) synth.cancel();
+
     setError('');
-    recognition.start();
-    
+    setIsRecording(true);
+    try { recognition.stop(); } catch {}
+
+    // Wire handlers per turn
     recognition.onresult = (event) => {
+      clearListenTimeout();
       const transcript = event.results[0][0].transcript;
       setUserTranscript(transcript);
       setIsRecording(false);
+      setRecognitionAttempts(0);
       analyzeLine(transcript);
     };
-    
     recognition.onerror = (event) => {
-      setError(`Erreur de reconnaissance: ${event.error}`);
+      clearListenTimeout();
       setIsRecording(false);
+      // Retry a couple of times automatically
+      if (recognitionAttempts < config.sttMaxAttempts && autoMode) {
+        setRecognitionAttempts(prev => prev + 1);
+        setTimeout(() => beginUserRecognition(), 400);
+      } else {
+        setError(`Erreur de reconnaissance: ${event.error}`);
+        // Move on to next line after a short delay to keep session flowing
+        if (autoMode) {
+          setTimeout(() => setCurrentLineIndex(prev => prev + 1), 800);
+        }
+      }
     };
+    recognition.onend = () => {
+      // If it ended without a result and we are still on user's turn, try again
+      if (isUsersTurn && autoMode && !userTranscript && recognitionAttempts < config.sttMaxAttempts) {
+        setRecognitionAttempts(prev => prev + 1);
+        setTimeout(() => beginUserRecognition(), 300);
+      }
+    };
+
+    try {
+      recognition.start();
+      // Timeout for silence: re-try a couple times, else skip
+      const tid = setTimeout(() => {
+        try { recognition.stop(); } catch {}
+        if (recognitionAttempts < config.sttMaxAttempts && autoMode) {
+          setRecognitionAttempts(prev => prev + 1);
+          setTimeout(() => beginUserRecognition(), 300);
+        } else {
+          setIsRecording(false);
+          // Skip if user is silent after retries
+          if (autoMode) setCurrentLineIndex(prev => prev + 1);
+        }
+      }, config.userListenTimeoutMs);
+      setListenTimeoutId(tid);
+    } catch (e) {
+      setIsRecording(false);
+      // If cannot start, proceed to next line to avoid blocking
+      if (autoMode) setCurrentLineIndex(prev => prev + 1);
+    }
+  };
+
+  // Helper: normalize for oral comparison (lowercase, remove accents, strip punctuation, trim)
+  const normalizeForOral = (str) => {
+    return str
+      .toLowerCase()
+      .normalize('NFD').replace(/[ -]/g, '') // Remove accents
+      .replace(/[.,;:!?"'’\-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   };
 
   const analyzeLine = (recited) => {
     const original = play.structure[currentLineIndex].line;
+    const normOriginal = normalizeForOral(original);
+    const normRecited = normalizeForOral(recited);
     const dmp = new diff_match_patch();
-    const diff = dmp.diff_main(original, recited);
+    const diff = dmp.diff_main(normOriginal, normRecited);
     dmp.diff_cleanupSemantic(diff);
     const levenshtein = dmp.diff_levenshtein(diff);
-    const score = ((original.length - levenshtein) / original.length) * 100;
+    const score = ((normOriginal.length - levenshtein) / Math.max(1, normOriginal.length)) * 100;
     const result = { diff, fidelityScore: parseFloat(Math.max(0, score).toFixed(2)) };
     setLineResult(result);
-    
+
     // Update stats
-    if (result.fidelityScore >= 80) {
-      setPlayStats(prev => ({ 
-        ...prev, 
-        correctLines: prev.correctLines + 1 
-      }));
+    setPlayStats(prev => ({
+      ...prev,
+      totalLines: prev.totalLines + 1,
+      correctLines: prev.correctLines + (result.fidelityScore >= (config.fidelityThreshold || 80) ? 1 : 0),
+    }));
+
+    // Auto-advance in auto mode
+    if (autoMode) {
+      setTimeout(() => {
+        setUserTranscript('');
+        setLineResult(null);
+        setCurrentLineIndex(prev => prev + 1);
+      }, config.autoNextDelayMs);
     }
   };
 
@@ -215,6 +336,9 @@ const TheatrePage = () => {
     setLineResult(null);
     setPlayStats({ correctLines: 0, totalLines: 0 });
     if (synth.speaking) synth.cancel();
+    try { if (recognition) recognition.stop(); } catch {}
+    clearListenTimeout();
+    setRecognitionAttempts(0);
   };
 
   // Calculate progress
@@ -254,6 +378,23 @@ const TheatrePage = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">🎭 {play.title}</h1>
           <p className="text-gray-600">Choisissez votre rôle pour commencer la répétition</p>
+        </div>
+
+        {/* Mic & Auto Mode Info */}
+        <div className="card mb-6">
+          <div className="text-sm text-gray-700">
+            <div className="flex items-start gap-2">
+              <span className="text-xl">🎙️</span>
+              <div>
+                <div className="font-medium">Autorisez l'accès au micro</div>
+                <p>
+                  Après avoir choisi votre personnage, l'application lancera automatiquement la pièce.
+                  Les autres personnages parleront à voix haute. Lorsque c'est votre tour, l'écoute du micro
+                  démarre automatiquement. Vous n'avez à cliquer sur aucun bouton durant la session.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {characters.length === 0 && (
@@ -479,22 +620,32 @@ const TheatrePage = () => {
                 {/* User Controls */}
                 {isUsersTurn && (
                   <div className="space-y-4">
-                    <div className="text-center">
-                      <button
-                        onClick={handleReciteLine}
-                        disabled={!!userTranscript || isRecording || !recognition}
-                        className="btn btn-primary btn-lg"
-                      >
+                    {autoMode && recognition ? (
+                      <div className="text-center text-sm text-gray-600">
                         {isRecording ? (
-                          <span className="flex items-center">
-                            <div className="loading mr-2"></div>
-                            En écoute...
-                          </span>
+                          <span className="inline-flex items-center"><div className="loading mr-2"></div>En écoute...</span>
                         ) : (
-                          '🎤 Réciter la réplique'
+                          <span>À vous de parler…</span>
                         )}
-                      </button>
-                    </div>
+                      </div>
+                    ) : (
+                      <div className="text-center">
+                        <button
+                          onClick={() => beginUserRecognition()}
+                          disabled={!!userTranscript || isRecording || !recognition}
+                          className="btn btn-primary btn-lg"
+                        >
+                          {isRecording ? (
+                            <span className="flex items-center">
+                              <div className="loading mr-2"></div>
+                              En écoute...
+                            </span>
+                          ) : (
+                            '🎤 Réciter la réplique'
+                          )}
+                        </button>
+                      </div>
+                    )}
 
                     {/* User Transcript */}
                     {userTranscript && (
@@ -508,14 +659,16 @@ const TheatrePage = () => {
                     {lineResult && (
                       <div className="space-y-4">
                         <DiffResult diff={lineResult.diff} score={lineResult.fidelityScore} />
-                        <div className="text-center">
-                          <button
-                            onClick={handleNextLine}
-                            className="btn btn-success"
-                          >
-                            ➡️ Réplique suivante
-                          </button>
-                        </div>
+                        {!autoMode && (
+                          <div className="text-center">
+                            <button
+                              onClick={handleNextLine}
+                              className="btn btn-success"
+                            >
+                              ➡️ Réplique suivante
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -545,6 +698,104 @@ const TheatrePage = () => {
 
           {/* Side Panel */}
           <div className="space-y-6">
+                {/* Settings */}
+                <div className="card">
+                  <div className="card-header">
+                    <h4 className="card-title">⚙️ Réglages</h4>
+                    <p className="card-description">Ajustez le comportement de la séance</p>
+                  </div>
+                  <div className="space-y-4 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span>Mode automatique</span>
+                      <button
+                        className={`btn btn-sm ${autoMode ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => {
+                          const next = !autoMode;
+                          setAutoMode(next);
+                          try { localStorage.setItem('theatreConfig', JSON.stringify({ ...config, autoMode: next })); } catch {}
+                        }}
+                      >
+                        {autoMode ? 'Activé' : 'Désactivé'}
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="block mb-1">Seuil de réussite (%)</label>
+                      <input
+                        type="number"
+                        min={50}
+                        max={100}
+                        value={config.fidelityThreshold}
+                        onChange={(e) => saveConfig({ fidelityThreshold: Math.max(50, Math.min(100, Number(e.target.value) || 0)) })}
+                        className="input"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block mb-1">Débit voix (TTS)</label>
+                      <input
+                        type="range"
+                        min={0.6}
+                        max={1.2}
+                        step={0.05}
+                        value={config.speechRate}
+                        onChange={(e) => saveConfig({ speechRate: Number(e.target.value) })}
+                        className="w-full"
+                      />
+                      <div className="text-gray-500">{config.speechRate.toFixed(2)}</div>
+                    </div>
+
+                    <div>
+                      <label className="block mb-1">Silence max (écoute, secondes)</label>
+                      <input
+                        type="number"
+                        min={3}
+                        max={15}
+                        value={Math.round(config.userListenTimeoutMs / 1000)}
+                        onChange={(e) => saveConfig({ userListenTimeoutMs: Math.max(3, Math.min(15, Number(e.target.value) || 0)) * 1000 })}
+                        className="input"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block mb-1">Tentatives auto (écoute)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={3}
+                        value={config.sttMaxAttempts}
+                        onChange={(e) => saveConfig({ sttMaxAttempts: Math.max(0, Math.min(3, Number(e.target.value) || 0)) })}
+                        className="input"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block mb-1">Délai après votre réplique (ms)</label>
+                      <input
+                        type="number"
+                        min={300}
+                        max={3000}
+                        step={100}
+                        value={config.autoNextDelayMs}
+                        onChange={(e) => saveConfig({ autoNextDelayMs: Math.max(300, Math.min(3000, Number(e.target.value) || 0)) })}
+                        className="input"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block mb-1">Délai entre répliques TTS (ms)</label>
+                      <input
+                        type="number"
+                        min={200}
+                        max={2000}
+                        step={50}
+                        value={config.ttsAutoNextDelayMs}
+                        onChange={(e) => saveConfig({ ttsAutoNextDelayMs: Math.max(200, Math.min(2000, Number(e.target.value) || 0)) })}
+                        className="input"
+                      />
+                    </div>
+                  </div>
+                </div>
             {/* Play Info */}
             <div className="card">
               <div className="card-header">
