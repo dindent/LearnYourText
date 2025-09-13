@@ -17,8 +17,8 @@ const HomePage = () => {
         </div>
         
         <div className="flex gap-4 justify-center">
-          <Link to="/dashboard" className="btn btn-primary btn-lg">
-            🚀 Commencer maintenant
+          <Link to="/texts" className="btn btn-primary btn-lg">
+            🚀 Accéder à mes textes
           </Link>
           <Link to="/import" className="btn btn-secondary btn-lg">
             📝 Importer un texte
@@ -53,69 +53,6 @@ const HomePage = () => {
             Pratiquez vos scènes avec le mode spécialement conçu pour le théâtre, 
             avec gestion des personnages et didascalies.
           </p>
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section className="card">
-        <div className="card-header text-center">
-          <h2 className="card-title text-2xl">Comment ça fonctionne ?</h2>
-          <p className="card-description">Trois étapes simples pour commencer</p>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="text-center">
-            <div className="bg-primary text-white w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">
-              1
-            </div>
-            <h3 className="font-semibold mb-2">Importez votre texte</h3>
-            <p className="text-gray-600 text-sm">
-              Copiez-collez ou importez votre pièce depuis un fichier. 
-              L'application détecte automatiquement la structure.
-            </p>
-          </div>
-          
-          <div className="text-center">
-            <div className="bg-primary text-white w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">
-              2
-            </div>
-            <h3 className="font-semibold mb-2">Choisissez votre mode</h3>
-            <p className="text-gray-600 text-sm">
-              Mode récitation pour l'apprentissage ligne par ligne, 
-              ou mode théâtre pour les scènes complètes.
-            </p>
-          </div>
-          
-          <div className="text-center">
-            <div className="bg-primary text-white w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">
-              3
-            </div>
-            <h3 className="font-semibold mb-2">Entraînez-vous</h3>
-            <p className="text-gray-600 text-sm">
-              Répétez et perfectionnez votre jeu. 
-              L'application vous indique vos progrès et erreurs.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Quick Stats */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-        <div className="text-center p-4">
-          <div className="text-2xl font-bold text-primary">∞</div>
-          <div className="text-sm text-gray-600">Textes illimités</div>
-        </div>
-        <div className="text-center p-4">
-          <div className="text-2xl font-bold text-primary">🎯</div>
-          <div className="text-sm text-gray-600">Précision de mémorisation</div>
-        </div>
-        <div className="text-center p-4">
-          <div className="text-2xl font-bold text-primary">⚡</div>
-          <div className="text-sm text-gray-600">Interface rapide</div>
-        </div>
-        <div className="text-center p-4">
-          <div className="text-2xl font-bold text-primary">📱</div>
-          <div className="text-sm text-gray-600">Compatible mobile</div>
         </div>
       </section>
     </div>

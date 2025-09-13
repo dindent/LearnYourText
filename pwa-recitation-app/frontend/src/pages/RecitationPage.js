@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import api from '../services/api';
+import { getTextById, analyzeText } from '../services/localApi';
 import DiffResult from '../components/DiffResult';
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -29,7 +29,7 @@ const RecitationPage = () => {
   useEffect(() => {
     const fetchText = async () => {
       try {
-        const res = await api.get(`/texts/${textId}`);
+        const res = await getTextById(textId);
         setText(res.data);
       } catch (err) {
         setError('Impossible de charger le texte.');
@@ -102,9 +102,7 @@ const RecitationPage = () => {
     
     setAnalysisLoading(true);
     try {
-      const res = await api.post(`/texts/${textId}/analyze`, {
-        recitedText: finalTranscript.current,
-      });
+      const res = await analyzeText(textId, finalTranscript.current);
       setResult(res.data);
     } catch (err) {
       setError('Erreur lors de l\'analyse du texte.');
@@ -137,8 +135,8 @@ const RecitationPage = () => {
         <div className="text-center py-8">
           <div className="text-4xl mb-4">😞</div>
           <p className="text-red-600 mb-4">{error}</p>
-          <Link to="/dashboard" className="btn btn-primary">
-            Retour au tableau de bord
+          <Link to="/" className="btn btn-primary">
+            Retour à l'accueil
           </Link>
         </div>
       </div>
@@ -151,8 +149,8 @@ const RecitationPage = () => {
         <div className="text-center py-8">
           <div className="text-4xl mb-4">📝</div>
           <p className="text-gray-600 mb-4">Texte introuvable.</p>
-          <Link to="/dashboard" className="btn btn-primary">
-            Retour au tableau de bord
+          <Link to="/" className="btn btn-primary">
+            Retour à l'accueil
           </Link>
         </div>
       </div>
@@ -175,7 +173,7 @@ const RecitationPage = () => {
           >
             🔄 Recommencer
           </button>
-          <Link to="/dashboard" className="btn btn-secondary btn-sm">
+          <Link to="/" className="btn btn-secondary btn-sm">
             ⬅️ Retour
           </Link>
         </div>
@@ -294,7 +292,7 @@ const RecitationPage = () => {
                 🔄 Nouvelle Session
               </button>
               <Link 
-                to="/dashboard" 
+                to="/"
                 className="btn btn-secondary"
               >
                 📚 Choisir un autre texte

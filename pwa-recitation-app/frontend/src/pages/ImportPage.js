@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
-import { createWorker } from 'tesseract.js';
+import { createText, uploadPdf } from '../services/localApi';
 import TheatreParser from '../components/TheatreParser';
 
 const ImportPage = () => {
@@ -9,45 +8,22 @@ const ImportPage = () => {
     title: '',
     content: '',
     type: 'individual',
-    reviewers: [],
   });
-  const [users, setUsers] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [pdfFile, setPdfFile] = useState(null);
-  const [ocrProgress, setOcrProgress] = useState(0);
-  const [ocrStatus, setOcrStatus] = useState('');
   const [activeTab, setActiveTab] = useState('manual');
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const res = await api.get('/users');
-        setUsers(res.data);
-      } catch (err) {
-        console.error('Failed to fetch users', err);
-      }
-    };
-    fetchUsers();
-  }, []);
-
-  const { title, content, type, reviewers } = formData;
+  const { title, content, type } = formData;
 
   const onManualChange = (e) => {
-    const { name, value, type: inputType, checked, options } = e.target;
-    if (name === 'reviewers') {
-      const selectedOptions = Array.from(options)
-        .filter((option) => option.selected)
-        .map((option) => option.value);
-      setFormData({ ...formData, reviewers: selectedOptions });
-    } else {
-      setFormData({
-        ...formData,
-        [name]: inputType === 'checkbox' ? (checked ? 'theatre' : 'individual') : value,
-      });
-    }
+    const { name, value, type: inputType, checked } = e.target;
+    setFormData({
+      ...formData,
+      [name]: inputType === 'checkbox' ? (checked ? 'theatre' : 'individual') : value,
+    });
     setError('');
   };
 
@@ -62,7 +38,7 @@ const ImportPage = () => {
     setError('');
     
     try {
-      await api.post('/texts', {
+      const newText = await createText({
         ...formData,
         title: title.trim(),
         content: content.trim()
@@ -90,15 +66,8 @@ const ImportPage = () => {
     setLoading(true);
     setError('');
     
-    const formDataObj = new FormData();
-    formDataObj.append('pdfFile', pdfFile);
-    
     try {
-      await api.post('/texts/upload/pdf', formDataObj, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      await uploadPdf(pdfFile);
       setSuccess('PDF importé avec succès !');
       setTimeout(() => {
         navigate('/dashboard');
@@ -111,45 +80,6 @@ const ImportPage = () => {
     }
   };
 
-  const handleOcr = async (e) => {
-    const imageFile = e.target.files[0];
-    if (!imageFile) return;
-
-    setOcrStatus('Initialisation...');
-    setOcrProgress(0);
-    setError('');
-    
-    try {
-      const worker = await createWorker({
-        logger: m => {
-          setOcrStatus(m.status);
-          if (m.status === 'recognizing text') {
-            setOcrProgress(Math.round(m.progress * 100));
-          }
-        }
-      });
-
-      await worker.loadLanguage('fra');
-      await worker.initialize('fra');
-      const { data: { text } } = await worker.recognize(imageFile);
-      setOcrStatus('Terminé !');
-
-      // Populate the manual form with the OCR result
-      setFormData(prev => ({
-        ...prev,
-        title: imageFile.name.replace(/\.[^/.]+$/, ""),
-        content: text,
-      }));
-      
-      setActiveTab('manual');
-      await worker.terminate();
-    } catch (err) {
-      setError('Erreur lors de l\'extraction du texte.');
-      setOcrStatus('');
-      console.error(err);
-    }
-  };
-
   const clearForm = () => {
     setFormData({
       title: '',
@@ -159,8 +89,6 @@ const ImportPage = () => {
     setError('');
     setSuccess('');
     setPdfFile(null);
-    setOcrStatus('');
-    setOcrProgress(0);
   };
 
   return (
@@ -214,16 +142,6 @@ const ImportPage = () => {
           >
             📄 Import PDF
           </button>
-          <button
-            onClick={() => setActiveTab('ocr')}
-            className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
-              activeTab === 'ocr'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            📷 Reconnaissance OCR
-          </button>
         </div>
 
         {/* Manual Input Tab */}
@@ -274,31 +192,6 @@ const ImportPage = () => {
                 </div>
               </div>
             </div>
-
-            {type === 'theatre' && (
-              <div className="form-group">
-                <label className="form-label" htmlFor="reviewers">
-                  Inviter des utilisateurs à réviser
-                </label>
-                <select
-                  multiple
-                  id="reviewers"
-                  name="reviewers"
-                  value={reviewers}
-                  onChange={onManualChange}
-                  className="form-input"
-                >
-                  {users.map((user) => (
-                    <option key={user._id} value={user._id}>
-                      {user.name}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-sm text-gray-500 mt-1">
-                  Maintenez Ctrl (ou Cmd sur Mac) pour en sélectionner plusieurs.
-                </p>
-              </div>
-            )}
 
             <div className="form-group">
               <label className="form-label" htmlFor="content">
@@ -400,58 +293,6 @@ const ImportPage = () => {
                   '📤 Importer le PDF'
                 )}
               </button>
-            </div>
-          </div>
-        )}
-
-        {/* OCR Tab */}
-        {activeTab === 'ocr' && (
-          <div className="space-y-6">
-            <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
-              <div className="text-4xl mb-4">📷</div>
-              <h3 className="text-lg font-semibold mb-2">Extraction de texte par OCR</h3>
-              <p className="text-gray-600 mb-4">
-                Prenez une photo ou sélectionnez une image contenant du texte
-              </p>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleOcr}
-                className="mb-4"
-              />
-              
-              {ocrStatus && ocrStatus !== 'Terminé !' && (
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-gray-600">
-                    Statut: {ocrStatus}
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-primary h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${ocrProgress}%` }}
-                    ></div>
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    {ocrProgress}% complété
-                  </div>
-                </div>
-              )}
-              
-              {ocrStatus === 'Terminé !' && (
-                <div className="text-green-600 font-medium">
-                  ✅ OCR terminé ! Le texte a été copié dans l'onglet "Saisie manuelle"
-                </div>
-              )}
-            </div>
-            
-            <div className="card">
-              <h4 className="font-semibold mb-2">💡 Conseils pour une meilleure reconnaissance</h4>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>• Utilisez des images nettes et bien éclairées</li>
-                <li>• Assurez-vous que le texte est lisible</li>
-                <li>• Évitez les angles et la distorsion</li>
-                <li>• Les images en haute résolution donnent de meilleurs résultats</li>
-              </ul>
             </div>
           </div>
         )}

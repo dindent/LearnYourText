@@ -298,7 +298,7 @@ const getCharacterStats = (parsedScript) => {
   return stats;
 };
 
-module.exports = { 
+export {
   parseScript,
   getCharacterStats,
   detectMethodColon,

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import api from '../services/api';
+import { getTextById, parseTheatreScript } from '../services/localApi';
 import DiffResult from '../components/DiffResult';
 import diff_match_patch from 'diff-match-patch';
 
@@ -54,53 +54,11 @@ const TheatrePage = () => {
     }
   };
 
-  // Helper: light client-side parser when backend didn't parse the script
-  // Supports formats like "NAME: line", "NAME - line", "NAME — line",
-  // and uppercase speaker names followed by a line on next line.
-  const clientParseTheatre = (content = '') => {
-    if (!content || typeof content !== 'string') return [];
-    const lines = content.split(/\r?\n/);
-    const parsed = [];
-    const directPattern = /^(?<name>[A-ZÀ-ÖØ-Þ'’ \-\.]+)\s*[:\-—]\s*(?<text>.+)$/;
-
-    for (let i = 0; i < lines.length; i++) {
-      const raw = lines[i].trim();
-      if (!raw) continue;
-
-      // Case 1: NAME: text (single line)
-      const m = raw.match(directPattern);
-      if (m?.groups?.name && m?.groups?.text) {
-        const name = m.groups.name.trim();
-        const text = m.groups.text.trim();
-        if (name && text) parsed.push({ character: name, line: text });
-        continue;
-      }
-
-      // Case 2: NAME on a line (all caps-ish), next non-empty line is text
-      const isAllCaps = /^[A-ZÀ-ÖØ-Þ'’ \-\.]+$/.test(raw) && raw.length <= 40; // heuristic
-      if (isAllCaps) {
-        // Look ahead for the next non-empty line as the dialogue
-        let j = i + 1;
-        let textLine = '';
-        while (j < lines.length && !textLine) {
-          const candidate = lines[j].trim();
-          if (candidate) textLine = candidate;
-          j++;
-        }
-        if (textLine) {
-          parsed.push({ character: raw, line: textLine });
-          i = j - 1; // advance to the consumed line
-        }
-      }
-    }
-    return parsed;
-  };
-
   // Fetch play data
   useEffect(() => {
     const fetchPlay = async () => {
       try {
-        const res = await api.get(`/texts/${textId}`);
+        const res = await getTextById(textId);
         
         if (res.data.type !== 'theatre') {
           setError('Ce n\'est pas un script de théâtre.');
@@ -119,20 +77,9 @@ const TheatrePage = () => {
             : 0;
           setPlayStats({ correctLines: 0, totalLines: userLines });
         } else {
-          // No structure found, try light client-side parsing first
-          console.log('No structure found, attempting client-side parse...');
-          const clientParsed = clientParseTheatre(res.data.content);
-          if (clientParsed.length > 0) {
-            console.log(`Client-side parse produced ${clientParsed.length} lines.`);
-            const updated = { ...res.data, structure: clientParsed };
-            setPlay(updated);
-            setCharacters(extractCharactersFromStructure(clientParsed));
-            setError('');
-          } else {
-            // Fallback: ask backend to parse
-            console.log('Client-side parse failed, attempting backend re-parse...');
+            console.log('No structure found, attempting to parse...');
             try {
-              const parseRes = await api.post(`/texts/${textId}/parse-theatre`);
+              const parseRes = await parseTheatreScript(textId);
               if (parseRes.data && parseRes.data.parsedScript) {
                 const parsedScript = parseRes.data.parsedScript;
                 setPlay({ ...res.data, structure: parsedScript });
@@ -145,7 +92,6 @@ const TheatrePage = () => {
               console.error('Parse error:', parseErr);
               setError('Ce script ne semble pas être au bon format. Les personnages n\'ont pas pu être détectés.');
             }
-          }
         }
         
       } catch (err) {
@@ -210,12 +156,6 @@ const TheatrePage = () => {
   };
 
   const handleRoleSelection = (character) => {
-    console.log('=== ROLE SELECTION ===');
-    console.log('Character selected:', character);
-    console.log('Current characters array:', characters);
-    console.log('Current play structure:', play?.structure);
-    console.log('====================');
-    
     setSelectedRole(character);
     setCurrentLineIndex(0);
     setPlayStats({ correctLines: 0, totalLines: 0 });
@@ -297,8 +237,8 @@ const TheatrePage = () => {
         <div className="text-center py-8">
           <div className="text-4xl mb-4">🎭</div>
           <p className="text-red-600 mb-4">{error}</p>
-          <Link to="/dashboard" className="btn btn-primary">
-            Retour au tableau de bord
+          <Link to="/" className="btn btn-primary">
+            Retour à l'accueil
           </Link>
         </div>
       </div>
@@ -306,18 +246,6 @@ const TheatrePage = () => {
   }
 
   if (!play) return null;
-
-  // Debug information - more detailed
-  console.log('=== THEATRE PAGE DEBUG ===');
-  console.log('Play data:', play);
-  console.log('Play type:', play?.type);
-  console.log('Play structure exists:', !!play?.structure);
-  console.log('Play structure length:', play?.structure?.length);
-  console.log('Characters found:', characters);
-  console.log('Characters length:', characters.length);
-  console.log('Structure details:', play?.structure);
-  console.log('Raw content preview:', play?.content?.substring(0, 200));
-  console.log('========================');
 
   // Role Selection UI
   if (!selectedRole) {
@@ -328,7 +256,6 @@ const TheatrePage = () => {
           <p className="text-gray-600">Choisissez votre rôle pour commencer la répétition</p>
         </div>
 
-        {/* Show debug info if no characters found */}
         {characters.length === 0 && (
           <div className="card mb-6">
             <div className="card-header">
@@ -346,7 +273,7 @@ const TheatrePage = () => {
                   onClick={async () => {
                     try {
                       console.log('Attempting to re-parse...');
-                      const parseRes = await api.post(`/texts/${textId}/parse-theatre`);
+                      const parseRes = await parseTheatreScript(textId);
                       if (parseRes.data && parseRes.data.parsedScript) {
                         setPlay({...play, structure: parseRes.data.parsedScript});
                         const uniqueChars = [...new Set(parseRes.data.parsedScript.map(line => line.character))];
@@ -380,44 +307,6 @@ const TheatrePage = () => {
             </p>
           </div>
 
-          {/* Debug/Test Section */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded p-4 mb-4">
-            <h4 className="font-bold text-yellow-800 mb-2">🔧 Debug - Tests</h4>
-            <div className="space-y-2 text-sm">
-              <p><strong>Personnages trouvés:</strong> {characters.length}</p>
-              <p><strong>Structure existante:</strong> {play?.structure ? 'Oui' : 'Non'} ({play?.structure?.length || 0} lignes)</p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    console.log('=== CREATING TEST CHARACTERS ===');
-                    const testChars = ['HAMLET', 'OPHÉLIE', 'CLAUDIUS'];
-                    const testStructure = [
-                      { character: 'HAMLET', line: 'Être ou ne pas être, telle est la question.' },
-                      { character: 'OPHÉLIE', line: 'Mon seigneur, comment vous portez-vous ?' },
-                      { character: 'CLAUDIUS', line: 'Mon cher Hamlet...' }
-                    ];
-                    setCharacters(testChars);
-                    setPlay({...play, structure: testStructure});
-                    console.log('Test characters created:', testChars);
-                  }}
-                  className="btn btn-sm bg-yellow-200 text-yellow-800 hover:bg-yellow-300"
-                >
-                  Créer des personnages de test
-                </button>
-                <button
-                  onClick={() => {
-                    console.log('Current play object:', play);
-                    console.log('Current characters:', characters);
-                    alert(`Debug Info:\nPersonnages: ${characters.length}\nStructure: ${play?.structure?.length || 0} lignes`);
-                  }}
-                  className="btn btn-sm bg-blue-200 text-blue-800 hover:bg-blue-300"
-                >
-                  Voir debug info
-                </button>
-              </div>
-            </div>
-          </div>
-
           {characters.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {characters.map(char => {
@@ -449,8 +338,8 @@ const TheatrePage = () => {
           )}
 
           <div className="mt-6 flex justify-center">
-            <Link to="/dashboard" className="btn btn-secondary">
-              ⬅️ Retour au tableau de bord
+            <Link to="/" className="btn btn-secondary">
+              ⬅️ Retour à l'accueil
             </Link>
           </div>
         </div>
@@ -548,7 +437,7 @@ const TheatrePage = () => {
               >
                 👥 Changer de rôle
               </button>
-              <Link to="/dashboard" className="btn btn-secondary btn-lg">
+              <Link to="/" className="btn btn-secondary btn-lg">
                 📚 Autres textes
               </Link>
             </div>

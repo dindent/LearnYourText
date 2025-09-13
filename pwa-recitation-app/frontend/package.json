@@ -6,14 +6,13 @@
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
-    "axios": "^1.6.2",
     "diff-match-patch": "^1.0.5",
+    "pdfjs-dist": "^5.4.149",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.21.1",
     "react-scripts": "5.0.1",
-
-    "tesseract.js": "^5.0.4",
+    "uuid": "^13.0.0",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
@@ -39,5 +38,15 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "jest": {
+    "transformIgnorePatterns": [
+      "/node_modules/(?!uuid)/",
+      "\\.pnp\\.[^\\/]+$"
+    ],
+    "moduleNameMapper": {
+      "pdfjs-dist/build/pdf": "<rootDir>/src/mocks/pdfjs-dist.js",
+      "pdfjs-dist/build/pdf.worker.entry": "<rootDir>/src/mocks/pdfjs-dist.js"
+    }
   }
 }
