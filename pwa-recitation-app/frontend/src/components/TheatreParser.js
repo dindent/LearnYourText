@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import api from '../services/api';
+import { testParseScript } from '../services/localApi';
+import { getCharacterStats } from '../utils/scriptParser';
 
 const TheatreParser = ({ content, onParseComplete }) => {
   const [parseResult, setParseResult] = useState(null);
@@ -16,10 +17,28 @@ const TheatreParser = ({ content, onParseComplete }) => {
     setError('');
 
     try {
-      const response = await api.post('/texts/test-parse', { content });
-      setParseResult(response.data);
+      const response = await testParseScript(content);
+      const parsed = response.data?.parsedScript || [];
+
+      // Compute derived stats client-side
+      const characterStats = getCharacterStats(parsed);
+      const characterCount = Object.keys(characterStats).length;
+      const totalLines = parsed.length;
+      const success = totalLines > 0 && characterCount > 0;
+      const preview = parsed.slice(0, 10);
+
+      const result = {
+        parsedScript: parsed,
+        characterStats,
+        characterCount,
+        totalLines,
+        success,
+        preview,
+      };
+
+      setParseResult(result);
       if (onParseComplete) {
-        onParseComplete(response.data);
+        onParseComplete(result);
       }
     } catch (err) {
       setError('Erreur lors du test d\'analyse du script');

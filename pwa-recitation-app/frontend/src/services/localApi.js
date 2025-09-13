@@ -1,11 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
 import diff_match_patch from 'diff-match-patch';
-import * as pdfjsLib from 'pdfjs-dist/build/pdf';
-import * as pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry';
+// Use ESM-compatible imports for pdfjs-dist v5
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/build/pdf.mjs';
 import { parseScript } from '../utils/scriptParser';
 
-// Required for pdf.js to work
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+// Configure pdf.js worker to a locally served file from /public (copy step below)
+GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 const getTextsFromStorage = () => {
     const texts = localStorage.getItem('texts');
@@ -79,7 +79,7 @@ export const uploadPdf = async (file) => {
     return new Promise((resolve, reject) => {
         reader.onload = async (event) => {
             try {
-                const pdf = await pdfjsLib.getDocument({ data: event.target.result }).promise;
+                const pdf = await getDocument({ data: event.target.result }).promise;
                 let content = '';
                 for (let i = 1; i <= pdf.numPages; i++) {
                     const page = await pdf.getPage(i);
